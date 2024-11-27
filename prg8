@@ -1,0 +1,27 @@
+declare function local:generate-intervals(
+    $start-datetime as xs:dateTime,
+    $end-datetime as xs:dateTime,
+    $interval-duration as xs:integer
+) as element(IntervalDetails) {
+    if ($start-datetime eq $end-datetime) then
+        ()
+    else
+        let $duration := xs:dayTimeDuration(concat('PT', $interval-duration, 'M'))
+        let $intervals := 
+            for $i in 0 to fn:floor(fn:hours-from-duration($end-datetime - $start-datetime)*60 div $interval-duration)
+            let $interval-start := $start-datetime + ($i * $duration)
+            let $interval-end := if ($interval-start + $duration gt $end-datetime) then $end-datetime else $interval-start + $duration
+            where $interval-start ne $interval-end
+            return
+                <interval attr="{ $i + 1 }">
+                    <startdatetime>{ $interval-start }</startdatetime>
+                    <enddatetime>{ $interval-end }</enddatetime>
+                </interval>
+        return
+            <IntervalDetails>{ $intervals }</IntervalDetails>
+};
+
+let $start := xs:dateTime("2024-11-27T09:30:00")
+let $end := xs:dateTime("2024-11-27T11:00:00")
+let $interval-duration := 30
+return local:generate-intervals($start, $end, $interval-duration)
