@@ -1,0 +1,41 @@
+xquery version "1.0-ml";
+let $json-string := '{"condition":"and","rules":[{"field":"C1","operator":null},{"field":"C2","operator":null},
+{"condition":"or","rules":[{"condition":"and","rules":[{"field":"C3","operator":null},{"field":"C6","operator":null}]},
+{"condition":"and","rules":[{"field":"C4","operator":null},{"field":"C5","operator":null}]}]}]}'
+let $node := xdmp:from-json-string($json-string)
+
+let $condition := map:get($node, 'condition')
+let $rules := map:get($node, 'rules')                
+
+let $queries :=
+    for $rule in json:array-values($rules)
+    return 
+        if (map:contains($rule, 'field')) then
+            let $field := map:get($rule, 'field')
+            return cts:element-query(xs:QName($field), cts:true-query())
+        else
+            let $inner-condition := map:get($rule, 'condition')
+            let $inner-rules := map:get($rule, 'rules')
+            let $inner-queries :=
+                for $inner-rule in json:array-values($inner-rules)
+                return 
+                    if (map:contains($inner-rule, 'field')) then
+                        let $inner-field := map:get($inner-rule, 'field')
+                        return cts:element-query(xs:QName($inner-field), cts:true-query())
+                    else
+                        let $inner-inner-condition := map:get($inner-rule, 'condition')
+                        let $inner-inner-rules := map:get($inner-rule, 'rules')
+                        let $inner-inner-queries :=
+                            for $inner-inner-rule in json:array-values($inner-inner-rules)
+                            let $inner-inner-field := map:get($inner-inner-rule, 'field')
+                            return cts:element-query(xs:QName($inner-inner-field), cts:true-query())
+                        return if ($inner-inner-condition eq 'and') 
+                            then cts:and-query($inner-inner-queries) 
+                            else cts:or-query($inner-inner-queries)
+            return if ($inner-condition eq 'and') 
+                then cts:and-query($inner-queries) 
+                else cts:or-query($inner-queries)
+
+return if ($condition eq 'and') 
+    then cts:and-query($queries) 
+    else cts:or-query($queries)
