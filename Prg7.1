@@ -1,0 +1,33 @@
+xquery version "1.0-ml";
+
+declare function local:extract-field($field as xs:string) as xs:string {
+  fn:replace($field, '^cts:word-query\("([^"]+)".*$', '$1')
+};
+
+declare function local:process-rules($rules, $condition) as xs:string {
+  let $queries :=
+    for $rule in json:array-values($rules)
+    return 
+      if (map:contains($rule, 'field')) then
+        let $field := map:get($rule, 'field')
+        return local:extract-field($field)
+      else if (map:contains($rule, 'rules')) then
+        let $inner-condition := map:get($rule, 'condition')
+        let $inner-rules := map:get($rule, 'rules')
+        return  local:process-rules($inner-rules, $inner-condition)
+      else ()
+  return if ($condition eq 'and') 
+    then 'cts:and-query((' || fn:string-join($queries, ', ') || '))'
+    else 'cts:or-query((' || fn:string-join($queries, ', ') || '))'
+};
+
+let $json-string := '{"condition":"and","rules":[{"field":"C1","operator":null},{"field":"C2","operator":null},
+{"condition":"or","rules":[{"condition":"and","rules":[{"field":"C3","operator":null},{"field":"C6","operator":null}]},
+{"condition":"and","rules":[{"field":"C4","operator":null},{"field":"C5","operator":null}]}]}]}'
+let $node := xdmp:from-json-string($json-string)
+
+let $condition := map:get($node, 'condition')
+let $rules := map:get($node, 'rules')
+
+let $result := local:process-rules($rules, $condition)
+return $result
